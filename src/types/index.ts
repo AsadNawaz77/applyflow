@@ -10,6 +10,22 @@ export type JobType = 'Internship' | 'Full-Time' | 'Contract' | 'Part-Time';
 
 export type Location = 'Remote' | 'Onsite' | 'Hybrid' | string;
 
+export interface JobHistoryEvent {
+  id: string;
+  type: 'created' | 'status_changed' | 'reflection_updated';
+  timestamp: string;
+  fromStatus?: JobStatus;
+  toStatus?: JobStatus;
+  note?: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+  createdAt: string;
+}
+
 export interface Job {
   id: string;
   companyName: string;
@@ -22,7 +38,12 @@ export interface Job {
   status: JobStatus;
   followUpDate?: string;
   notes?: string;
+  resumeVersion?: string;
+  reflection?: string;
+  checklist?: ChecklistItem[];
+  history?: JobHistoryEvent[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface JobFormData {
@@ -36,6 +57,8 @@ export interface JobFormData {
   status: JobStatus;
   followUpDate?: string;
   notes?: string;
+  resumeVersion?: string;
+  reflection?: string;
 }
 
 export const JOB_STATUSES: JobStatus[] = [
