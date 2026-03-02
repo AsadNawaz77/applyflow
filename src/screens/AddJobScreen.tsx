@@ -20,6 +20,8 @@ import { AppColors, SPACING } from '../utils/constants';
 import { useJobsContext } from '../context/JobsContext';
 import { JobFormData, JOB_STATUSES, JOB_TYPES, LOCATION_OPTIONS } from '../types';
 import { toISODateString } from '../utils/dateUtils';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddJob'>;
 
@@ -35,6 +37,7 @@ const initialForm: JobFormData = {
 
 export function AddJobScreen({ navigation }: Props) {
   const { addJob } = useJobsContext();
+  const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
   const [form, setForm] = useState<JobFormData>(initialForm);
@@ -76,7 +79,11 @@ export function AddJobScreen({ navigation }: Props) {
     if (!validate()) return;
 
     try {
-      const newJobId = await addJob(form);
+      const normalizedForm: JobFormData =
+        form.status === 'Offer' || form.status === 'Rejected'
+          ? { ...form, followUpDate: undefined }
+          : form;
+      const newJobId = await addJob(normalizedForm);
       if (form.status === 'Offer') {
         navigation.dispatch(
           CommonActions.reset({
@@ -117,14 +124,16 @@ export function AddJobScreen({ navigation }: Props) {
   };
 
   const locationValue = LOCATION_OPTIONS.includes(form.location) ? form.location : 'Custom';
+  const showFollowUpDate = form.status !== 'Offer' && form.status !== 'Rejected';
 
   return (
     <>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-      <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+        <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -136,7 +145,7 @@ export function AddJobScreen({ navigation }: Props) {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: SPACING.xl + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
       >
         <FormField
@@ -208,12 +217,14 @@ export function AddJobScreen({ navigation }: Props) {
           options={JOB_STATUSES}
           onChange={(value) => update('status', value as JobFormData['status'])}
         />
-        <DatePickerField
-          label="Follow-Up Date (optional)"
-          value={form.followUpDate}
-          onChange={(value) => update('followUpDate', value || undefined)}
-          placeholder="Select date"
-        />
+        {showFollowUpDate ? (
+          <DatePickerField
+            label="Follow-Up Date (optional)"
+            value={form.followUpDate}
+            onChange={(value) => update('followUpDate', value || undefined)}
+            placeholder="Select date"
+          />
+        ) : null}
         <FormField
           label="Notes (optional)"
           value={form.notes ?? ''}
@@ -225,9 +236,9 @@ export function AddJobScreen({ navigation }: Props) {
         <TouchableOpacity style={styles.button} onPress={handleSubmit} activeOpacity={0.8}>
           <Text style={styles.buttonText}>Save Application</Text>
         </TouchableOpacity>
-        <View style={{ height: SPACING.xl }} />
       </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
       <AppDialog
         visible={dialog.visible}
         title={dialog.title}

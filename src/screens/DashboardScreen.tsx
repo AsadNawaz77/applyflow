@@ -28,6 +28,7 @@ import { SPACING, AppColors } from '../utils/constants';
 import { useJobsContext } from '../context/JobsContext';
 import { useAppTheme } from '../context/ThemeContext';
 import { Job } from '../types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Dashboard'>,
@@ -126,7 +127,7 @@ export function DashboardScreen({ navigation, route }: Props) {
   }, [route.params, navigation, congratsOpacity, getJobById]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {(showConfetti || showCongrats) && (
         <View style={styles.animationContainer} pointerEvents="none">
           {showConfetti ? (
@@ -280,7 +281,7 @@ export function DashboardScreen({ navigation, route }: Props) {
         job={readOnlyJob}
         onClose={() => setReadOnlyJob(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -295,7 +296,7 @@ function createStyles(colors: AppColors) {
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: SPACING.md,
-      paddingTop: SPACING.lg,
+      paddingTop: SPACING.sm,
       paddingBottom: SPACING.md,
     },
     headerActions: {

@@ -9,6 +9,11 @@ import {
   WeeklyGoalState,
 } from '../storage/jobStorage';
 import { diffDays, getStartOfWeekISO, toISODateString } from '../utils/dateUtils';
+import {
+  cancelJobNotifications,
+  scheduleFollowUpReminder,
+  scheduleStageReminders,
+} from '../utils/notificationUtils';
 
 const INTERVIEW_STATUSES: JobStatus[] = [
   'HR Interview',
@@ -221,7 +226,7 @@ export function useJobs() {
   const addJob = useCallback(
     async (formData: JobFormData) => {
       const now = new Date().toISOString();
-      const newJob: Job = {
+      let newJob: Job = {
         id: uuidv4(),
         ...formData,
         checklist: [],
@@ -236,6 +241,13 @@ export function useJobs() {
         createdAt: now,
         updatedAt: now,
       };
+      const followUpReminderId = await scheduleFollowUpReminder(newJob);
+      if (followUpReminderId) {
+        newJob = {
+          ...newJob,
+          followUpReminderId,
+        };
+      }
       const updated = [...jobs, newJob];
       setJobs(updated);
       await saveJobs(updated);
@@ -255,12 +267,27 @@ export function useJobs() {
         history.push(buildStatusHistoryEvent(job.status, formData.status));
       }
 
-      const updatedJob: Job = {
+      await cancelJobNotifications(job);
+
+      let updatedJob: Job = {
         ...job,
         ...formData,
+        stageReminderDayBeforeId: undefined,
+        stageReminderOneHourId: undefined,
+        followUpReminderId: undefined,
         history,
         updatedAt: now,
       };
+
+      const stageReminders = await scheduleStageReminders(updatedJob);
+      const followUpReminderId = await scheduleFollowUpReminder(updatedJob);
+      updatedJob = {
+        ...updatedJob,
+        stageReminderDayBeforeId: stageReminders.dayBeforeId,
+        stageReminderOneHourId: stageReminders.oneHourId,
+        followUpReminderId,
+      };
+
       const updated = jobs.map((entry) => (entry.id === id ? updatedJob : entry));
       setJobs(updated);
       await saveJobs(updated);
@@ -353,6 +380,10 @@ export function useJobs() {
 
   const deleteJob = useCallback(
     async (id: string) => {
+      const target = jobs.find((entry) => entry.id === id);
+      if (target) {
+        await cancelJobNotifications(target);
+      }
       const updated = jobs.filter((entry) => entry.id !== id);
       setJobs(updated);
       await saveJobs(updated);
@@ -382,9 +413,10 @@ export function useJobs() {
     if (!Array.isArray(parsed)) {
       throw new Error('Backup JSON must be an array of jobs.');
     }
+    await Promise.all(jobs.map((job) => cancelJobNotifications(job)));
     await saveJobs(parsed as Job[]);
     await refreshJobs();
-  }, [refreshJobs]);
+  }, [jobs, refreshJobs]);
 
   const weeklyProgress = useMemo(
     () => calculateWeeklyProgress(jobs, weeklyGoal, getStartOfWeekISO()),

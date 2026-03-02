@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { CompositeScreenProps } from '@react-navigation/native';
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { BottomTabScreenProps, useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -21,6 +21,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { MainTabParamList, RootStackParamList } from '../navigation/AppNavigator';
 import { Job } from '../types';
 import { AppColors, RADIUS, SPACING } from '../utils/constants';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'DataTools'>,
@@ -78,6 +79,8 @@ export function DataToolsScreen(_: Props) {
   const { jobs, exportJson, exportCsv, importJobsFromJson } = useJobsContext();
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
+  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const [importText, setImportText] = useState('');
   const [previewType, setPreviewType] = useState<'json' | 'csv'>('json');
   const [yearText, setYearText] = useState(String(new Date().getFullYear()));
@@ -248,11 +251,17 @@ export function DataToolsScreen(_: Props) {
 
   return (
     <>
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.title}>Backup & Import</Text>
         </View>
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabBarHeight + insets.bottom + SPACING.lg },
+          ]}
+        >
           <Text style={styles.sectionTitle}>Download CSV File</Text>
           <Text style={styles.sectionHint}>
             Export all applications or choose month/year for a period-specific file.
@@ -354,7 +363,7 @@ export function DataToolsScreen(_: Props) {
             <Text style={styles.importText}>Import Backup</Text>
           </TouchableOpacity>
         </ScrollView>
-      </View>
+      </SafeAreaView>
       <AppDialog
         visible={dialog.visible}
         title={dialog.title}
@@ -374,7 +383,7 @@ const createStyles = (colors: AppColors) =>
   },
   header: {
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.sm,
     paddingBottom: SPACING.md,
   },
   title: {

@@ -40,6 +40,10 @@ export interface Job {
   notes?: string;
   resumeVersion?: string;
   reflection?: string;
+  stageDateTime?: string;
+  stageReminderDayBeforeId?: string;
+  stageReminderOneHourId?: string;
+  followUpReminderId?: string;
   checklist?: ChecklistItem[];
   history?: JobHistoryEvent[];
   createdAt: string;
@@ -59,6 +63,7 @@ export interface JobFormData {
   notes?: string;
   resumeVersion?: string;
   reflection?: string;
+  stageDateTime?: string;
 }
 
 export const JOB_STATUSES: JobStatus[] = [

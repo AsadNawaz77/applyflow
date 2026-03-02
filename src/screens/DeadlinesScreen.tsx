@@ -8,6 +8,7 @@ import { useJobsContext } from '../context/JobsContext';
 import { useAppTheme } from '../context/ThemeContext';
 import { AppColors, RADIUS, SPACING } from '../utils/constants';
 import { formatDate } from '../utils/dateUtils';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Deadlines'>,
@@ -20,7 +21,7 @@ export function DeadlinesScreen({ navigation }: Props) {
   const styles = createStyles(colors);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Deadlines</Text>
       </View>
@@ -59,7 +60,7 @@ export function DeadlinesScreen({ navigation }: Props) {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -73,7 +74,7 @@ const createStyles = (colors: AppColors) =>
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.sm,
     paddingBottom: SPACING.sm,
   },
   title: {

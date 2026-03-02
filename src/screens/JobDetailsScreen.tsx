@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CommonActions } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList, ResultType } from '../navigation/AppNavigator';
 import { FormField } from '../components/FormField';
 import { DatePickerField } from '../components/DatePickerField';
+import { TimePickerField } from '../components/TimePickerField';
 import { PickerField } from '../components/PickerField';
 import { AppDialog, AppDialogAction } from '../components/AppDialog';
 import { useAppTheme } from '../context/ThemeContext';
@@ -21,11 +23,25 @@ import { AppColors, SPACING } from '../utils/constants';
 import { useJobsContext } from '../context/JobsContext';
 import { JobFormData, JOB_STATUSES, JOB_TYPES, LOCATION_OPTIONS } from '../types';
 import { formatDate } from '../utils/dateUtils';
+import {
+  combineDateAndTime,
+  extractLocalDateValue,
+  extractTimeValue,
+  isValidTimeHHMM,
+} from '../utils/notificationUtils';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobDetails'>;
+const INTERVIEW_STATUSES: JobFormData['status'][] = [
+  'HR Interview',
+  'Technical Interview',
+  'Final Round',
+];
 
 export function JobDetailsScreen({ navigation, route }: Props) {
   const { jobId } = route.params;
+  const insets = useSafeAreaInsets();
   const { colors } = useAppTheme();
   const styles = createStyles(colors);
   const { getJobById, updateJob, deleteJob, addChecklistItem, toggleChecklistItem, removeChecklistItem } =
@@ -33,6 +49,8 @@ export function JobDetailsScreen({ navigation, route }: Props) {
   const job = getJobById(jobId);
 
   const [form, setForm] = useState<JobFormData | null>(null);
+  const [stageDate, setStageDate] = useState<string | undefined>(undefined);
+  const [stageTime, setStageTime] = useState('10:00');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [newTask, setNewTask] = useState('');
   const [dialog, setDialog] = useState<{
@@ -69,9 +87,29 @@ export function JobDetailsScreen({ navigation, route }: Props) {
       followUpDate: job.followUpDate,
       notes: job.notes,
       resumeVersion: job.resumeVersion,
-      reflection: job.reflection,
+      stageDateTime: job.stageDateTime,
     });
+    if (job.stageDateTime) {
+      const stageAt = new Date(job.stageDateTime);
+      if (!Number.isNaN(stageAt.getTime())) {
+        setStageDate(extractLocalDateValue(stageAt));
+        setStageTime(extractTimeValue(stageAt));
+      }
+    } else {
+      setStageDate(undefined);
+      setStageTime('10:00');
+    }
   }, [job]);
+
+  useEffect(() => {
+    if (!job || !form) return;
+    const changedStatus = form.status !== job.status;
+    const movingToInterviewStage = INTERVIEW_STATUSES.includes(form.status);
+    if (changedStatus && movingToInterviewStage) {
+      setStageDate(undefined);
+      setStageTime('10:00');
+    }
+  }, [form?.status, job, form]);
 
   const update = <K extends keyof JobFormData>(key: K, value: JobFormData[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : null));
@@ -89,13 +127,38 @@ export function JobDetailsScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!form || !job || !validate()) return;
+    const changedStatus = form.status !== job.status;
+    const needsStageSchedule = changedStatus && INTERVIEW_STATUSES.includes(form.status);
+    if (needsStageSchedule) {
+      if (!stageDate) {
+        showDialog('Missing date', 'Select an interview/stage date to continue.');
+        return;
+      }
+      if (!isValidTimeHHMM(stageTime)) {
+        showDialog('Invalid time', 'Enter stage time in HH:MM format (24-hour).');
+        return;
+      }
+    }
+    const stageDateTime =
+      needsStageSchedule && stageDate ? combineDateAndTime(stageDate, stageTime) : undefined;
+    if (needsStageSchedule && !stageDateTime) {
+      showDialog('Invalid schedule', 'Please provide a valid stage date and time.');
+      return;
+    }
+    const normalizedStageDateTime = stageDateTime ?? undefined;
+    const normalizedFollowUpDate =
+      form.status === 'Offer' || form.status === 'Rejected' ? undefined : form.followUpDate;
     try {
       const wasOffer = job.status === 'Offer';
       const willOffer = form.status === 'Offer';
       const wasRejected = job.status === 'Rejected';
       const willReject = form.status === 'Rejected';
 
-      await updateJob(jobId, form);
+      await updateJob(jobId, {
+        ...form,
+        followUpDate: normalizedFollowUpDate,
+        stageDateTime: normalizedStageDateTime,
+      });
 
       if (!wasOffer && willOffer) {
         navigation.dispatch(
@@ -168,26 +231,41 @@ export function JobDetailsScreen({ navigation, route }: Props) {
   }
 
   const locationValue = LOCATION_OPTIONS.includes(form.location) ? form.location : 'Custom';
+  const showStageScheduleFields =
+    form.status !== job.status && INTERVIEW_STATUSES.includes(form.status);
+  const showFollowUpDate = form.status !== 'Offer' && form.status !== 'Rejected';
+  const editStatuses =
+    job.status === 'Applied' ? JOB_STATUSES : JOB_STATUSES.filter((status) => status !== 'Applied');
+  const visitedStatuses = new Set<JobFormData['status']>();
+  (job.history ?? []).forEach((entry) => {
+    if (entry.fromStatus) visitedStatuses.add(entry.fromStatus);
+    if (entry.toStatus) visitedStatuses.add(entry.toStatus);
+  });
+  visitedStatuses.add(job.status);
+  const disabledStatusOptions = Array.from(visitedStatuses).filter((status) => status !== form.status);
 
   return (
     <>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-      <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+        <View style={styles.header}>
         <TouchableOpacity
+          style={styles.backButton}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.backText}>{'< Back'}</Text>
+          <Ionicons name="chevron-back" size={17} color={colors.accent} />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Job Details</Text>
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: SPACING.xl + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
       >
         <FormField
@@ -256,27 +334,34 @@ export function JobDetailsScreen({ navigation, route }: Props) {
         <PickerField
           label="Status"
           value={form.status}
-          options={JOB_STATUSES}
+          options={editStatuses}
+          disabledOptions={disabledStatusOptions}
           onChange={(value) => update('status', value as JobFormData['status'])}
         />
-        <DatePickerField
-          label="Follow-Up Date (optional)"
-          value={form.followUpDate}
-          onChange={(value) => update('followUpDate', value || undefined)}
-          placeholder="Select date"
-        />
+        {showStageScheduleFields ? (
+          <>
+            <DatePickerField
+              label={`${form.status} Date`}
+              value={stageDate}
+              onChange={setStageDate}
+              placeholder="Select stage date"
+            />
+            <TimePickerField label={`${form.status} Time`} value={stageTime} onChange={setStageTime} />
+          </>
+        ) : null}
+        {showFollowUpDate ? (
+          <DatePickerField
+            label="Follow-Up Date (optional)"
+            value={form.followUpDate}
+            onChange={(value) => update('followUpDate', value || undefined)}
+            placeholder="Select date"
+          />
+        ) : null}
         <FormField
           label="Notes (optional)"
           value={form.notes ?? ''}
           onChangeText={(value) => update('notes', value || undefined)}
           placeholder="Add notes..."
-          multiline
-        />
-        <FormField
-          label="Reflection (optional)"
-          value={form.reflection ?? ''}
-          onChangeText={(value) => update('reflection', value || undefined)}
-          placeholder="What did you learn from this application?"
           multiline
         />
 
@@ -320,13 +405,17 @@ export function JobDetailsScreen({ navigation, route }: Props) {
               .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
               .map((entry) => (
                 <View key={entry.id} style={styles.historyItem}>
-                  <Text style={styles.historyTitle}>
-                    {entry.type === 'created'
-                      ? 'Application created'
-                      : entry.type === 'status_changed'
-                        ? `Status: ${entry.fromStatus} -> ${entry.toStatus}`
-                        : 'Reflection updated'}
-                  </Text>
+                  {entry.type === 'status_changed' ? (
+                    <View style={styles.historyStatusRow}>
+                      <Text style={styles.historyTitle}>Status: {entry.fromStatus}</Text>
+                      <Ionicons name="arrow-forward" size={13} color={colors.muted} />
+                      <Text style={styles.historyTitle}>{entry.toStatus}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.historyTitle}>
+                      {entry.type === 'created' ? 'Application created' : 'Reflection updated'}
+                    </Text>
+                  )}
                   <Text style={styles.historyTime}>{formatDate(entry.timestamp)}</Text>
                 </View>
               ))
@@ -339,9 +428,9 @@ export function JobDetailsScreen({ navigation, route }: Props) {
         <TouchableOpacity style={styles.deleteButton} onPress={handleDelete} activeOpacity={0.8}>
           <Text style={styles.deleteButtonText}>Delete Application</Text>
         </TouchableOpacity>
-        <View style={{ height: SPACING.xl }} />
       </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
       <AppDialog
         visible={dialog.visible}
         title={dialog.title}
@@ -371,7 +460,12 @@ const createStyles = (colors: AppColors) =>
   backText: {
     fontSize: 16,
     color: colors.accent,
+    marginLeft: 2,
     marginRight: SPACING.md,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
@@ -508,6 +602,12 @@ const createStyles = (colors: AppColors) =>
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  historyStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    flexWrap: 'wrap',
   },
   historyTime: {
     marginTop: 2,

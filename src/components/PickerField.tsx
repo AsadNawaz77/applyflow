@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SPACING, RADIUS, AppColors } from '../utils/constants';
 import { useAppTheme } from '../context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface PickerFieldProps {
   label: string;
@@ -18,6 +19,7 @@ interface PickerFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   allowCustom?: boolean;
+  disabledOptions?: string[];
 }
 
 export function PickerField({
@@ -27,15 +29,18 @@ export function PickerField({
   onChange,
   placeholder = 'Select',
   allowCustom,
+  disabledOptions = [],
 }: PickerFieldProps) {
   const { colors } = useAppTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
   const [show, setShow] = useState(false);
   const [customText, setCustomText] = useState('');
 
   const displayValue = value || (allowCustom && customText ? customText : null);
 
   const handleSelect = (option: string) => {
+    if (disabledOptions.includes(option)) return;
     onChange(option);
     setShow(false);
   };
@@ -61,18 +66,22 @@ export function PickerField({
             <FlatList
               data={allOptions}
               keyExtractor={(item) => item}
+              contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
                     styles.option,
                     value === item && styles.optionSelected,
+                    disabledOptions.includes(item) && styles.optionDisabled,
                   ]}
                   onPress={() => handleSelect(item)}
+                  disabled={disabledOptions.includes(item)}
                 >
                   <Text
                     style={[
                       styles.optionText,
                       value === item && styles.optionTextSelected,
+                      disabledOptions.includes(item) && styles.optionTextDisabled,
                     ]}
                   >
                     {item}
@@ -97,7 +106,7 @@ export function PickerField({
   );
 }
 
-function createStyles(colors: AppColors) {
+function createStyles(colors: AppColors, bottomInset: number) {
   return StyleSheet.create({
     container: {
       marginBottom: SPACING.md,
@@ -141,7 +150,10 @@ function createStyles(colors: AppColors) {
       borderLeftWidth: 1,
       borderRightWidth: 1,
       borderColor: colors.border,
-      paddingBottom: 34,
+      paddingBottom: Math.max(34, bottomInset + 16),
+    },
+    listContent: {
+      paddingBottom: SPACING.sm,
     },
     modalTitle: {
       fontSize: 16,
@@ -159,6 +171,9 @@ function createStyles(colors: AppColors) {
     optionSelected: {
       backgroundColor: colors.accentSoft,
     },
+    optionDisabled: {
+      opacity: 0.45,
+    },
     optionText: {
       fontSize: 16,
       color: colors.primary,
@@ -166,6 +181,9 @@ function createStyles(colors: AppColors) {
     optionTextSelected: {
       fontWeight: '600',
       color: colors.accent,
+    },
+    optionTextDisabled: {
+      color: colors.muted,
     },
     customHint: {
       padding: SPACING.md,

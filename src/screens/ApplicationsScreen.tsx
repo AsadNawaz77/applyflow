@@ -18,6 +18,7 @@ import { useAppTheme } from '../context/ThemeContext';
 import { MainTabParamList, RootStackParamList } from '../navigation/AppNavigator';
 import { Job, JobStatus, JOB_STATUSES, JOB_TYPES } from '../types';
 import { AppColors, RADIUS, SPACING } from '../utils/constants';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Applications'>,
@@ -52,6 +53,14 @@ export function ApplicationsScreen({ navigation }: Props) {
   const [monthFilter, setMonthFilter] = useState<string>('All');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [readOnlyJob, setReadOnlyJob] = useState<Job | null>(null);
+  const handleStatusFilterChange = (value: 'All' | JobStatus) => {
+    setStatusFilter(value);
+    setTypeFilter('All');
+  };
+  const handleTypeFilterChange = (value: 'All' | (typeof JOB_TYPES)[number]) => {
+    setTypeFilter(value);
+    setStatusFilter('All');
+  };
 
   const years = useMemo(() => {
     const set = new Set<string>();
@@ -109,7 +118,7 @@ export function ApplicationsScreen({ navigation }: Props) {
   }, [filteredJobs]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Applications</Text>
         <TouchableOpacity
@@ -129,6 +138,7 @@ export function ApplicationsScreen({ navigation }: Props) {
           placeholder="Search company or role..."
           placeholderTextColor={colors.muted}
         />
+        <Text style={styles.filterLabel}>Year</Text>
         <View style={styles.filterRow}>
           {years.map((year) => (
             <TouchableOpacity
@@ -142,6 +152,7 @@ export function ApplicationsScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </View>
+        <Text style={styles.filterLabel}>Month</Text>
         <View style={styles.filterRow}>
           {['All', ...Array.from({ length: 12 }, (_, i) => String(i + 1))].map((month) => (
             <TouchableOpacity
@@ -155,6 +166,7 @@ export function ApplicationsScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </View>
+        <Text style={styles.filterLabel}>Sort</Text>
         <View style={styles.filterRow}>
           {(['recent', 'oldest', 'company'] as SortOption[]).map((option) => (
             <TouchableOpacity
@@ -167,9 +179,12 @@ export function ApplicationsScreen({ navigation }: Props) {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+        <Text style={styles.filterLabel}>Status</Text>
+        <View style={styles.filterRow}>
           <TouchableOpacity
             style={[styles.chip, statusFilter === 'All' && styles.chipActive]}
-            onPress={() => setStatusFilter('All')}
+            onPress={() => handleStatusFilterChange('All')}
           >
             <Text style={[styles.chipText, statusFilter === 'All' && styles.chipTextActive]}>
               All Status
@@ -179,16 +194,19 @@ export function ApplicationsScreen({ navigation }: Props) {
             <TouchableOpacity
               key={status}
               style={[styles.chip, statusFilter === status && styles.chipActive]}
-              onPress={() => setStatusFilter(status)}
+              onPress={() => handleStatusFilterChange(status)}
             >
               <Text style={[styles.chipText, statusFilter === status && styles.chipTextActive]}>
                 {status}
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+        <Text style={styles.filterLabel}>Type</Text>
+        <View style={styles.filterRow}>
           <TouchableOpacity
             style={[styles.chip, typeFilter === 'All' && styles.chipActive]}
-            onPress={() => setTypeFilter('All')}
+            onPress={() => handleTypeFilterChange('All')}
           >
             <Text style={[styles.chipText, typeFilter === 'All' && styles.chipTextActive]}>
               All Types
@@ -198,7 +216,7 @@ export function ApplicationsScreen({ navigation }: Props) {
             <TouchableOpacity
               key={type}
               style={[styles.chip, typeFilter === type && styles.chipActive]}
-              onPress={() => setTypeFilter(type)}
+              onPress={() => handleTypeFilterChange(type)}
             >
               <Text style={[styles.chipText, typeFilter === type && styles.chipTextActive]}>
                 {type}
@@ -250,7 +268,7 @@ export function ApplicationsScreen({ navigation }: Props) {
         job={readOnlyJob}
         onClose={() => setReadOnlyJob(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -265,7 +283,7 @@ const createStyles = (colors: AppColors) =>
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.sm,
     paddingBottom: SPACING.md,
   },
   title: {
@@ -317,6 +335,15 @@ const createStyles = (colors: AppColors) =>
     flexWrap: 'wrap',
     gap: SPACING.xs,
     marginBottom: SPACING.xs,
+  },
+  filterLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SPACING.xs,
+    marginTop: SPACING.xs,
   },
   chip: {
     borderWidth: 1,
