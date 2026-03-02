@@ -27,6 +27,15 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-sharing", "expo-notifications"]
+    "plugins": [
+      "expo-sharing",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e1717d18-067c-4c7f-891b-b0cca498de5c"
+      }
+    },
+    "owner": "asadnawaz"
   }
 }
